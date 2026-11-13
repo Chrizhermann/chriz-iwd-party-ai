@@ -1,0 +1,72 @@
+// Chriz IWD Party AI: repaired Passive Retaliation (apass.BS) for IWD:EE 2.7.3.0
+// Never interrupts manual orders (ActionListEmpty); retaliates only when idle and attacked.
+
+IF
+  InParty(Myself)
+  ModalState(SHAMANDANCE)
+THEN
+  RESPONSE #100
+    NoAction()
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  AttackedBy([EVILCUTOFF],DEFAULT)
+  See(LastAttackerOf(Myself))
+  !StateCheck(LastAttackerOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(LastAttackerOf(Myself),GOODCUTOFF)
+  !InParty(LastAttackerOf(Myself))
+  Range(LastAttackerOf(Myself),4)
+THEN
+  RESPONSE #100
+    EquipMostDamagingMelee()
+    AttackReevaluate(LastAttackerOf(Myself),30)
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  AttackedBy([EVILCUTOFF],DEFAULT)
+  See(LastAttackerOf(Myself))
+  !StateCheck(LastAttackerOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(LastAttackerOf(Myself),GOODCUTOFF)
+  !InParty(LastAttackerOf(Myself))
+  !Range(LastAttackerOf(Myself),4)
+  CanEquipRanged()
+THEN
+  RESPONSE #100
+    EquipRanged()
+    AttackReevaluate(LastAttackerOf(Myself),30)
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  AttackedBy([EVILCUTOFF],DEFAULT)
+  See(LastAttackerOf(Myself))
+  !StateCheck(LastAttackerOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(LastAttackerOf(Myself),GOODCUTOFF)
+  !InParty(LastAttackerOf(Myself))
+  !Range(LastAttackerOf(Myself),4)
+  !CanEquipRanged()
+THEN
+  RESPONSE #100
+    EquipMostDamagingMelee()
+    AttackReevaluate(LastAttackerOf(Myself),30)
+END

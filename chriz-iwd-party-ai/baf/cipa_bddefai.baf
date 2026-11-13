@@ -1,0 +1,340 @@
+// Chriz IWD Party AI: clean-room Advanced AI (BDDEFAI.BCS) for IWD:EE 2.7.3.0
+// Omitted intentionally in v0.1.0: automatic items/potions, special abilities, and spells.
+
+// 1. Reset & First-Time Initialization
+
+IF
+  Global("BDAI_RESET_TIMERS","GLOBAL",1)
+THEN
+  RESPONSE #100
+    SetGlobal("BDAI_INIT_SKILL","LOCALS",0)
+    SetGlobal("BDAI_INIT_ATTACK","LOCALS",0)
+    SetGlobal("BDAI_RESET_TIMERS","GLOBAL",0)
+    Continue()
+END
+
+IF
+  InParty(Myself)
+  Global("BDAI_INIT_SKILL","LOCALS",0)
+  Global("BDAI_SKILL_MODE","LOCALS",0)
+  OR(3)
+    Class(Myself,THIEF_ALL)
+    Class(Myself,MONK)
+    Class(Myself,SHAMAN)
+THEN
+  RESPONSE #100
+    SetGlobal("BDAI_INIT_SKILL","LOCALS",1)
+    SetGlobal("BDAI_SKILL_MODE","LOCALS",1)
+    Continue()
+END
+
+IF
+  InParty(Myself)
+  Global("BDAI_INIT_SKILL","LOCALS",0)
+THEN
+  RESPONSE #100
+    SetGlobal("BDAI_INIT_SKILL","LOCALS",1)
+    Continue()
+END
+
+IF
+  InParty(Myself)
+  Global("BDAI_INIT_ATTACK","LOCALS",0)
+  Global("BDAI_ATTACK_MODE","LOCALS",0)
+  IsWeaponRanged(Myself)
+THEN
+  RESPONSE #100
+    SetGlobal("BDAI_INIT_ATTACK","LOCALS",1)
+    SetGlobal("BDAI_ATTACK_MODE","LOCALS",2)
+    Continue()
+END
+
+IF
+  InParty(Myself)
+  Global("BDAI_INIT_ATTACK","LOCALS",0)
+THEN
+  RESPONSE #100
+    SetGlobal("BDAI_INIT_ATTACK","LOCALS",1)
+    Continue()
+END
+
+// 2. Shamanic Dance Guard & Auto-Modal Marker Cleanup
+
+IF
+  InParty(Myself)
+  ModalState(SHAMANDANCE)
+THEN
+  RESPONSE #100
+    NoAction()
+END
+
+IF
+  InParty(Myself)
+  Global("CIPA_AUTO_SONG","LOCALS",1)
+  !ModalState(BATTLESONG)
+THEN
+  RESPONSE #100
+    SetGlobal("CIPA_AUTO_SONG","LOCALS",0)
+    Continue()
+END
+
+IF
+  InParty(Myself)
+  Global("CIPA_AUTO_TURN","LOCALS",1)
+  !ModalState(TURNUNDEAD)
+THEN
+  RESPONSE #100
+    SetGlobal("CIPA_AUTO_TURN","LOCALS",0)
+    Continue()
+END
+
+// 3. Weapon Preference (BDAI_ATTACK_MODE: 1 = Prefer Melee, 2 = Prefer Ranged)
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_ATTACK_MODE","LOCALS",1)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  IsWeaponRanged(Myself)
+THEN
+  RESPONSE #100
+    EquipMostDamagingMelee()
+    Continue()
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_ATTACK_MODE","LOCALS",2)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  See(NearestEnemyOf(Myself))
+  Range(NearestEnemyOf(Myself),4)
+  IsWeaponRanged(Myself)
+THEN
+  RESPONSE #100
+    EquipMostDamagingMelee()
+    Continue()
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_ATTACK_MODE","LOCALS",2)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  !Range(NearestEnemyOf(Myself),4)
+  !IsWeaponRanged(Myself)
+  CanEquipRanged()
+THEN
+  RESPONSE #100
+    EquipRanged()
+    Continue()
+END
+
+// 4. Modal Skills (BDAI_SKILL_MODE: 1 = Find Traps, 2 = Hide, 3 = Battlesong, 4 = Turn Undead)
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_SKILL_MODE","LOCALS",1)
+  !See([EVILCUTOFF])
+  !ActuallyInCombat()
+  !ModalState(DETECTTRAPS)
+  !ModalState(STEALTH)
+  !ModalState(TURNUNDEAD)
+  !ButtonDisabled(BUTTON_THIEVING)
+  OR(3)
+    Class(Myself,THIEF_ALL)
+    Class(Myself,MONK)
+    Class(Myself,SHAMAN)
+THEN
+  RESPONSE #100
+    FindTraps()
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_SKILL_MODE","LOCALS",2)
+  !GlobalTimerNotExpired("CIPA_HIDE_TMR","LOCALS")
+  !StateCheck(Myself,STATE_INVISIBLE)
+  !ModalState(STEALTH)
+  !ModalState(TURNUNDEAD)
+  !See([EVILCUTOFF])
+  !ButtonDisabled(BUTTON_STEALTH)
+  OR(3)
+    Class(Myself,THIEF_ALL)
+    Class(Myself,RANGER_ALL)
+    Class(Myself,MONK)
+THEN
+  RESPONSE #100
+    SetGlobalTimer("CIPA_HIDE_TMR","LOCALS",6)
+    Hide()
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_SKILL_MODE","LOCALS",3)
+  !ModalState(BATTLESONG)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  Class(Myself,BARD_ALL)
+  OR(2)
+    See([EVILCUTOFF])
+    ActuallyInCombat()
+THEN
+  RESPONSE #100
+    SetGlobal("CIPA_AUTO_SONG","LOCALS",1)
+    BattleSong()
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_SKILL_MODE","LOCALS",3)
+  Global("CIPA_AUTO_SONG","LOCALS",1)
+  ModalState(BATTLESONG)
+  !See([EVILCUTOFF])
+  !ActuallyInCombat()
+  Delay(6)
+THEN
+  RESPONSE #100
+    SetGlobal("CIPA_AUTO_SONG","LOCALS",0)
+    ClearActions(Myself)
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_SKILL_MODE","LOCALS",4)
+  !ModalState(TURNUNDEAD)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ButtonDisabled(BUTTON_TURNUNDEAD)
+  OR(2)
+    Class(Myself,CLERIC_ALL)
+    Class(Myself,PALADIN_ALL)
+  See([EVILCUTOFF.UNDEAD])
+  Range([EVILCUTOFF.UNDEAD],15)
+THEN
+  RESPONSE #100
+    SetGlobal("CIPA_AUTO_TURN","LOCALS",1)
+    Turn()
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_SKILL_MODE","LOCALS",4)
+  Global("CIPA_AUTO_TURN","LOCALS",1)
+  ModalState(TURNUNDEAD)
+  !See([EVILCUTOFF.UNDEAD])
+  Delay(6)
+THEN
+  RESPONSE #100
+    SetGlobal("CIPA_AUTO_TURN","LOCALS",0)
+    ClearActions(Myself)
+END
+
+// 5. Weapon Attack Target Selection (BDAI_DISABLE_ATTACK == 0)
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_DISABLE_ATTACK","LOCALS",0)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  See(NearestEnemyOf(Myself))
+  !StateCheck(NearestEnemyOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(NearestEnemyOf(Myself),GOODCUTOFF)
+  !InParty(NearestEnemyOf(Myself))
+  WeaponEffectiveVs(NearestEnemyOf(Myself),MAINHAND)
+  WeaponCanDamage(NearestEnemyOf(Myself),MAINHAND)
+THEN
+  RESPONSE #100
+    AttackOneRound(NearestEnemyOf(Myself))
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_DISABLE_ATTACK","LOCALS",0)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  See(SecondNearestEnemyOf(Myself))
+  !StateCheck(SecondNearestEnemyOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(SecondNearestEnemyOf(Myself),GOODCUTOFF)
+  !InParty(SecondNearestEnemyOf(Myself))
+  WeaponEffectiveVs(SecondNearestEnemyOf(Myself),MAINHAND)
+  WeaponCanDamage(SecondNearestEnemyOf(Myself),MAINHAND)
+THEN
+  RESPONSE #100
+    AttackOneRound(SecondNearestEnemyOf(Myself))
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_DISABLE_ATTACK","LOCALS",0)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  See(ThirdNearestEnemyOf(Myself))
+  !StateCheck(ThirdNearestEnemyOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(ThirdNearestEnemyOf(Myself),GOODCUTOFF)
+  !InParty(ThirdNearestEnemyOf(Myself))
+  WeaponEffectiveVs(ThirdNearestEnemyOf(Myself),MAINHAND)
+  WeaponCanDamage(ThirdNearestEnemyOf(Myself),MAINHAND)
+THEN
+  RESPONSE #100
+    AttackOneRound(ThirdNearestEnemyOf(Myself))
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_DISABLE_ATTACK","LOCALS",0)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  See(NearestEnemyOf(Myself))
+  !StateCheck(NearestEnemyOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(NearestEnemyOf(Myself),GOODCUTOFF)
+  !InParty(NearestEnemyOf(Myself))
+  !HasItem("TROLLIMM",NearestEnemyOf(Myself))
+  !StateCheck(NearestEnemyOf(Myself),STATE_SLEEPING)
+THEN
+  RESPONSE #100
+    AttackOneRound(NearestEnemyOf(Myself))
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  Global("BDAI_DISABLE_ATTACK","LOCALS",0)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  AttackedBy([EVILCUTOFF],DEFAULT)
+  See(LastAttackerOf(Myself))
+  !StateCheck(LastAttackerOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(LastAttackerOf(Myself),GOODCUTOFF)
+  !InParty(LastAttackerOf(Myself))
+THEN
+  RESPONSE #100
+    AttackOneRound(LastAttackerOf(Myself))
+END

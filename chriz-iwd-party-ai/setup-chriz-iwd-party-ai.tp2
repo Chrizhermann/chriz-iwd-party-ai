@@ -1,0 +1,12 @@
+BACKUP ~weidu_external/backup/chriz-iwd-party-ai~
+AUTHOR ~Christopher Hermann (github.com/Chrizhermann/chriz-iwd-party-ai)~
+VERSION ~v0.1.0~
+
+AUTO_TRA ~chriz-iwd-party-ai/languages/%s~
+LANGUAGE ~English~ ~english~ ~chriz-iwd-party-ai/languages/english/setup.tra~
+
+BEGIN @100 DESIGNATED 0
+LABEL ~chriz-iwd-party-ai-main~
+REQUIRE_PREDICATE GAME_IS ~iwdee~ @9000
+INCLUDE ~chriz-iwd-party-ai/lib/cipa_main.tpa~
+LAF cipa_install_party_ai END

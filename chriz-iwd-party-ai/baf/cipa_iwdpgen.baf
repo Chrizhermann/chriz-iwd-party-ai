@@ -1,0 +1,122 @@
+// Chriz IWD Party AI: repaired Party Default (iwdpgen.BS / IWDPGEN.BCS) for IWD:EE 2.7.3.0
+// Auto Find Traps out of combat for Thief/Monk/Shaman plus distance-first combat attacks.
+
+IF
+  InParty(Myself)
+  ModalState(SHAMANDANCE)
+THEN
+  RESPONSE #100
+    NoAction()
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  !See([EVILCUTOFF])
+  !ActuallyInCombat()
+  !ModalState(TURNUNDEAD)
+  !ModalState(DETECTTRAPS)
+  !ModalState(STEALTH)
+  !ButtonDisabled(BUTTON_THIEVING)
+  OR(3)
+    Class(Myself,THIEF_ALL)
+    Class(Myself,MONK)
+    Class(Myself,SHAMAN)
+THEN
+  RESPONSE #100
+    FindTraps()
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  See(NearestEnemyOf(Myself))
+  !StateCheck(NearestEnemyOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(NearestEnemyOf(Myself),GOODCUTOFF)
+  !InParty(NearestEnemyOf(Myself))
+  WeaponEffectiveVs(NearestEnemyOf(Myself),MAINHAND)
+  WeaponCanDamage(NearestEnemyOf(Myself),MAINHAND)
+THEN
+  RESPONSE #100
+    AttackReevaluate(NearestEnemyOf(Myself),30)
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  See(SecondNearestEnemyOf(Myself))
+  !StateCheck(SecondNearestEnemyOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(SecondNearestEnemyOf(Myself),GOODCUTOFF)
+  !InParty(SecondNearestEnemyOf(Myself))
+  WeaponEffectiveVs(SecondNearestEnemyOf(Myself),MAINHAND)
+  WeaponCanDamage(SecondNearestEnemyOf(Myself),MAINHAND)
+THEN
+  RESPONSE #100
+    AttackReevaluate(SecondNearestEnemyOf(Myself),30)
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  See(ThirdNearestEnemyOf(Myself))
+  !StateCheck(ThirdNearestEnemyOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(ThirdNearestEnemyOf(Myself),GOODCUTOFF)
+  !InParty(ThirdNearestEnemyOf(Myself))
+  WeaponEffectiveVs(ThirdNearestEnemyOf(Myself),MAINHAND)
+  WeaponCanDamage(ThirdNearestEnemyOf(Myself),MAINHAND)
+THEN
+  RESPONSE #100
+    AttackReevaluate(ThirdNearestEnemyOf(Myself),30)
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  See(NearestEnemyOf(Myself))
+  !StateCheck(NearestEnemyOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(NearestEnemyOf(Myself),GOODCUTOFF)
+  !InParty(NearestEnemyOf(Myself))
+  !HasItem("TROLLIMM",NearestEnemyOf(Myself))
+  !StateCheck(NearestEnemyOf(Myself),STATE_SLEEPING)
+THEN
+  RESPONSE #100
+    AttackReevaluate(NearestEnemyOf(Myself),30)
+END
+
+IF
+  ActionListEmpty()
+  InParty(Myself)
+  !StateCheck(Myself,STATE_INVISIBLE)
+  CheckStat(Myself,0,SANCTUARY)
+  !ModalState(STEALTH)
+  !ModalState(BATTLESONG)
+  !ModalState(TURNUNDEAD)
+  AttackedBy([EVILCUTOFF],DEFAULT)
+  See(LastAttackerOf(Myself))
+  !StateCheck(LastAttackerOf(Myself),STATE_REALLY_DEAD)
+  !Allegiance(LastAttackerOf(Myself),GOODCUTOFF)
+  !InParty(LastAttackerOf(Myself))
+THEN
+  RESPONSE #100
+    AttackReevaluate(LastAttackerOf(Myself),30)
+END

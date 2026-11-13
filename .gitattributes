@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.tp2 text eol=crlf
+*.tpa text eol=crlf
+*.tra text eol=crlf
+*.baf text eol=lf
+*.2da text eol=crlf

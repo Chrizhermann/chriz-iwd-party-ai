@@ -1,0 +1,7 @@
+INCLUDE ~chriz-iwd-party-ai/lib/cipa_ui.tpa~
+INCLUDE ~chriz-iwd-party-ai/lib/cipa_scripts.tpa~
+
+DEFINE_ACTION_FUNCTION cipa_install_party_ai BEGIN
+  LAF cipa_patch_ui_menu END
+  LAF cipa_install_scripts END
+END

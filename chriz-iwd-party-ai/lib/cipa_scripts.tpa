@@ -1,0 +1,109 @@
+DEFINE_ACTION_FUNCTION cipa_install_scripts BEGIN
+  MKDIR ~scripts~
+
+  COPY ~chriz-iwd-party-ai/2da/PARTYAI.2DA~ ~override/PARTYAI.2DA~
+
+  COPY ~chriz-iwd-party-ai/baf/cipa_bddefai.baf~ ~override/BDDEFAI.BCS~
+    COMPILE_BAF_TO_BCS
+
+  COPY ~chriz-iwd-party-ai/baf/cipa_iwdpgen.baf~ ~override/IWDPGEN.BCS~
+    COMPILE_BAF_TO_BCS
+
+  COPY ~chriz-iwd-party-ai/baf/cipa_agen.baf~ ~scripts/aGen.BS~
+    COMPILE_BAF_TO_BCS
+
+  COPY ~chriz-iwd-party-ai/baf/cipa_apass.baf~ ~scripts/apass.BS~
+    COMPILE_BAF_TO_BCS
+
+  COPY ~chriz-iwd-party-ai/baf/cipa_iwdpgen.baf~ ~scripts/iwdpgen.BS~
+    COMPILE_BAF_TO_BCS
+
+  ACTION_BASH_FOR ~scripts~ ~^.+\.[bB][sS]$~ BEGIN
+    OUTER_SPRINT res_lower ~%BASH_FOR_RES%~
+    ACTION_TO_LOWER res_lower
+    ACTION_IF (NOT (~%res_lower%~ STR_EQ ~agen~
+                 OR ~%res_lower%~ STR_EQ ~apass~
+                 OR ~%res_lower%~ STR_EQ ~iwdpgen~
+                 OR ~%res_lower%~ STR_EQ ~none~)) BEGIN
+      OUTER_SET is_valid_bs = 0
+      COPY - ~%BASH_FOR_FILESPEC%~ ~inlined_cipa_bs_check~
+        PATCH_IF (BUFFER_LENGTH >= 4) BEGIN
+          READ_ASCII 0 sig (2)
+          PATCH_IF (~%sig%~ STR_EQ ~SC~) BEGIN
+            SET is_valid_bs = 1
+          END
+        END
+      ACTION_IF (is_valid_bs == 1) BEGIN
+        COPY ~%BASH_FOR_FILESPEC%~ ~%BASH_FOR_FILESPEC%~
+          DECOMPILE_AND_PATCH BEGIN
+            LPF cipa_repair_player_bs_baf END
+          END
+        BUT_ONLY
+      END ELSE BEGIN
+        PRINT ~chriz-iwd-party-ai: skipping unreadable script %BASH_FOR_FILESPEC%.~
+      END
+    END
+  END
+END
+
+DEFINE_PATCH_FUNCTION cipa_repair_player_bs_baf BEGIN
+  SET pos = 0
+  WHILE (pos < BUFFER_LENGTH) BEGIN
+    SET if_pos = (0 - 1)
+    PATCH_IF (pos == 0) BEGIN
+      PATCH_IF (INDEX_BUFFER (CASE_SENSITIVE ~^IF[%LNL%%MNL%%WNL% %TAB%]~ 0) == 0) BEGIN
+        SET if_pos = 0
+      END
+    END
+    PATCH_IF (if_pos < 0) BEGIN
+      SET nl_if = INDEX_BUFFER (CASE_SENSITIVE ~[%LNL%%MNL%%WNL%]IF[%LNL%%MNL%%WNL%]~ pos)
+      PATCH_IF (nl_if >= 0) BEGIN
+        SET if_pos = INDEX_BUFFER (CASE_SENSITIVE ~IF~ nl_if)
+      END
+    END
+
+    PATCH_IF (if_pos < 0) BEGIN
+      SET pos = BUFFER_LENGTH
+    END ELSE BEGIN
+      SET nl_end = INDEX_BUFFER (CASE_SENSITIVE ~[%LNL%%MNL%%WNL%]END~ if_pos)
+      PATCH_IF (nl_end < 0) BEGIN
+        SET pos = BUFFER_LENGTH
+      END ELSE BEGIN
+        SET end_kw = INDEX_BUFFER (CASE_SENSITIVE ~END~ nl_end)
+        SET blk_end = end_kw + 3
+        READ_ASCII if_pos orig_blk (blk_end - if_pos)
+        INNER_PATCH_SAVE new_blk ~%orig_blk%~ BEGIN
+          REPLACE_TEXTUALLY CASE_SENSITIVE ~\([ %TAB%%LNL%%MNL%%WNL%]\)See(\[EVILCUTOFF\])~ ~\1See(NearestEnemyOf(Myself))~
+          REPLACE_TEXTUALLY CASE_SENSITIVE ~!InParty(\[EVILCUTOFF\])~ ~!InParty(NearestEnemyOf(Myself))~
+          REPLACE_TEXTUALLY CASE_SENSITIVE ~\([! %TAB%%LNL%%MNL%%WNL%]\)Range(\[EVILCUTOFF\],[ %TAB%]*\([0-9]+\))~ ~\1Range(NearestEnemyOf(Myself),\2)~
+          REPLACE_TEXTUALLY CASE_SENSITIVE ~AttackReevaluate(\[EVILCUTOFF\],[ %TAB%]*\([0-9]+\))~ ~AttackReevaluate(NearestEnemyOf(Myself),\1)~
+          REPLACE_TEXTUALLY CASE_SENSITIVE ~AttackOneRound(\[EVILCUTOFF\])~ ~AttackOneRound(NearestEnemyOf(Myself))~
+          REPLACE_TEXTUALLY CASE_SENSITIVE ~Attack(\[EVILCUTOFF\])~ ~Attack(NearestEnemyOf(Myself))~
+
+          SET has_atk = (INDEX_BUFFER (CASE_SENSITIVE ~Attack(~) >= 0)
+                     || (INDEX_BUFFER (CASE_SENSITIVE ~AttackOneRound(~) >= 0)
+                     || (INDEX_BUFFER (CASE_SENSITIVE ~AttackReevaluate(~) >= 0)
+          SET has_ale = (INDEX_BUFFER (CASE_SENSITIVE ~ActionListEmpty()~) >= 0)
+          PATCH_IF (has_atk && !has_ale) BEGIN
+            SET hdr_eol = INDEX_BUFFER (~[%LNL%%MNL%%WNL%]~ 0)
+            PATCH_IF (hdr_eol >= 0) BEGIN
+              SPRINT ale_line ~%LNL%  ActionListEmpty()~
+              INSERT_BYTES hdr_eol (STRING_LENGTH ~%ale_line%~)
+              WRITE_ASCIIE hdr_eol ~%ale_line%~
+            END
+          END
+        END
+        PATCH_IF (NOT (~%new_blk%~ STR_EQ ~%orig_blk%~)) BEGIN
+          SET orig_len = blk_end - if_pos
+          SET new_len = STRING_LENGTH ~%new_blk%~
+          DELETE_BYTES if_pos orig_len
+          INSERT_BYTES if_pos new_len
+          WRITE_ASCIIE if_pos ~%new_blk%~
+          SET pos = if_pos + new_len
+        END ELSE BEGIN
+          SET pos = blk_end
+        END
+      END
+    END
+  END
+END

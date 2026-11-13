@@ -1,0 +1,10 @@
+__pycache__/
+.pytest_cache/
+.test-tmp/
+*.pyc
+*.log
+*.DEBUG
+*.debug
+weidu.exe
+setup-*.exe
+weidu_external/

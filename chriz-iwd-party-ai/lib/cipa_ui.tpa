@@ -1,0 +1,110 @@
+DEFINE_ACTION_FUNCTION cipa_patch_ui_menu BEGIN
+  ACTION_IF FILE_EXISTS_IN_GAME ~UI.MENU~ BEGIN
+    COPY_EXISTING ~UI.MENU~ ~override/UI.MENU~
+      LPF cipa_patch_ui_menu_buffer END
+    BUT_ONLY
+  END ELSE BEGIN
+    PRINT ~chriz-iwd-party-ai: UI.MENU not found; skipping CHARACTER_SCRIPT UI unlock.~
+  END
+END
+
+DEFINE_PATCH_FUNCTION cipa_patch_ui_menu_buffer BEGIN
+  SET cs_menu_pos = INDEX_BUFFER (~name[ %TAB%]+['"]CHARACTER_SCRIPT['"]~ 0)
+  PATCH_IF (cs_menu_pos < 0) BEGIN
+    PATCH_PRINT ~chriz-iwd-party-ai: CHARACTER_SCRIPT menu not found in UI.MENU; skipping UI patch.~
+  END ELSE BEGIN
+    // Slice A: scriptOptions + handleScriptOptionChange right before CHARACTER_SCRIPT
+    SET sopt_pos = RINDEX_BUFFER (~scriptOptions[ %TAB%%LNL%%MNL%%WNL%]*=~ cs_menu_pos)
+    SET lua_close_pos = RINDEX_BUFFER (~`~ cs_menu_pos)
+    PATCH_IF (sopt_pos >= 0 && lua_close_pos > sopt_pos) BEGIN
+      SET replace_end = lua_close_pos
+      SET func_pos = INDEX_BUFFER (~function[ %TAB%]+handleScriptOptionChange[ %TAB%]*([ %TAB%]*option[ %TAB%]*)~ sopt_pos)
+      PATCH_IF (func_pos >= 0 && func_pos < lua_close_pos) BEGIN
+        SET end_line = INDEX_BUFFER (CASE_SENSITIVE ~[%LNL%%MNL%%WNL%]end[ %TAB%]*\([%LNL%%MNL%%WNL%]\|`\)~ func_pos)
+        PATCH_IF (end_line >= 0 && end_line < lua_close_pos) BEGIN
+          SET end_kw = INDEX_BUFFER (CASE_SENSITIVE ~end~ end_line)
+          SET replace_end = end_kw + 3
+        END
+      END
+
+      SPRINT smart_lua ~~~~~scriptOptions =%LNL%{%LNL%	{'SCRIPT_ATTACK_ENEMIES_LABEL',		'SCRIPT_ATTACK_ENEMIES_DESCRIPTION',		 1, 0, false},%LNL%	{'SCRIPT_USE_MELEE_WEAPONS_LABEL',	'SCRIPT_USE_MELEE_WEAPONS_DESCRIPTION',		 2, 0, false},%LNL%	{'SCRIPT_USE_RANGED_WEAPONS_LABEL',	'SCRIPT_USE_RANGED_WEAPONS_DESCRIPTION',	 3, 0, false},%LNL%	{'SCRIPT_FIND_TRAPS_LABEL',			'SCRIPT_FIND_TRAPS_DESCRIPTION',			 8, 0, false},%LNL%	{'SCRIPT_HIDE_IN_SHADOWS_LABEL',	'SCRIPT_HIDE_IN_SHADOWS_DESCRIPTION',		 9, 0, false},%LNL%	{'SCRIPT_SING_BATTLESONG_LABEL',	'SCRIPT_SING_BATTLESONG_DESCRIPTION',		10, 0, false},%LNL%	{'SCRIPT_TURN_UNDEAD_LABEL',		'SCRIPT_TURN_UNDEAD_DESCRIPTION',			11, 0, false}%LNL%}%LNL%%LNL%function handleScriptOptionChange(option)%LNL%	local entry = scriptOptions[option]%LNL%	if entry == nil then%LNL%		return%LNL%	end%LNL%	local optId = entry[3]%LNL%	local turnOn = entry[4] ~= 2%LNL%%LNL%	local group = nil%LNL%	if optId == 2 or optId == 3 then%LNL%		group = { [2] = true, [3] = true }%LNL%	elseif optId == 8 or optId == 9 or optId == 10 or optId == 11 then%LNL%		group = { [8] = true, [9] = true, [10] = true, [11] = true }%LNL%	end%LNL%%LNL%	if group ~= nil and turnOn then%LNL%		for _, row in pairs(scriptOptions) do%LNL%			if group[row[3]] then%LNL%				row[4] = 0%LNL%				row[5] = false%LNL%			end%LNL%		end%LNL%	end%LNL%%LNL%	if turnOn then%LNL%		entry[4] = 2%LNL%		entry[5] = true%LNL%	else%LNL%		entry[4] = 0%LNL%		entry[5] = false%LNL%	end%LNL%end~~~~~
+
+      SET old_len = replace_end - sopt_pos
+      SET new_len = STRING_LENGTH ~%smart_lua%~
+      DELETE_BYTES sopt_pos old_len
+      INSERT_BYTES sopt_pos new_len
+      WRITE_ASCIIE sopt_pos ~%smart_lua%~
+    END ELSE BEGIN
+      PATCH_PRINT ~chriz-iwd-party-ai: scriptOptions block not found before CHARACTER_SCRIPT; leaving options table unchanged.~
+    END
+
+    // Re-locate Slice B (CHARACTER_SCRIPT menu body) after Slice A length change
+    SET cs_menu_pos = INDEX_BUFFER (~name[ %TAB%]+['"]CHARACTER_SCRIPT['"]~ 0)
+    PATCH_IF (cs_menu_pos >= 0) BEGIN
+      SET next_menu_pos = INDEX_BUFFER (~[%LNL%%MNL%%WNL%]menu[ %TAB%%LNL%%MNL%%WNL%]*{~ cs_menu_pos)
+      SET next_tick_pos = INDEX_BUFFER (~`~ cs_menu_pos)
+      SET cs_end_pos = BUFFER_LENGTH
+      PATCH_IF (next_menu_pos >= 0 && next_menu_pos < cs_end_pos) BEGIN
+        SET cs_end_pos = next_menu_pos
+      END
+      PATCH_IF (next_tick_pos >= 0 && next_tick_pos < cs_end_pos) BEGIN
+        SET cs_end_pos = next_tick_pos
+      END
+
+      READ_ASCII cs_menu_pos cs_body (cs_end_pos - cs_menu_pos)
+      INNER_PATCH_SAVE cs_body ~%cs_body%~ BEGIN
+        REPLACE_TEXTUALLY ~\(%WNL%\|%LNL%\|%MNL%\)[ %TAB%]*if showingSmartOptions then scriptDescription = getUiString('CHARACTER_SCRIPT_SMART_SCRIPT_DESCRIPTION') end~ ~~
+        REPLACE_TEXTUALLY ~[ %TAB%]*scriptDescription[ %TAB%]*=[ %TAB%]*\(t\|getUiString\)[ %TAB%]*([ %TAB%]*scriptOptions\[scriptList_idx\]\[2\][ %TAB%]*)\(%WNL%\|%LNL%\|%MNL%\)?~ ~~
+        REPLACE_TEXTUALLY ~showingSmartOptions[ %TAB%]*=[ %TAB%]*false~ ~showingSmartOptions = (scriptList_idx == 2)~
+
+        SET first_sso = INDEX_BUFFER (~showingSmartOptions[ %TAB%]*=[ %TAB%]*([ %TAB%]*scriptList_idx[ %TAB%]*==[ %TAB%]*2[ %TAB%]*)~ 0)
+        PATCH_IF (first_sso >= 0) BEGIN
+          SET prev_eol = RINDEX_BUFFER (~[%LNL%%MNL%%WNL%]~ first_sso)
+          SPRINT indent ~~
+          PATCH_IF (prev_eol >= 0 && prev_eol < first_sso) BEGIN
+            READ_ASCII (prev_eol + 1) indent (first_sso - prev_eol - 1)
+          END
+          SET line_eol = INDEX_BUFFER (~[%LNL%%MNL%%WNL%]~ first_sso)
+          PATCH_IF (line_eol >= 0) BEGIN
+            READ_BYTE line_eol eol_b
+            PATCH_IF (eol_b == 13) BEGIN
+              SPRINT eol_seq ~%WNL%~
+            END ELSE BEGIN
+              SPRINT eol_seq ~%LNL%~
+            END
+            SPRINT desc_guard ~%eol_seq%%indent%if showingSmartOptions then scriptDescription = getUiString('CHARACTER_SCRIPT_SMART_SCRIPT_DESCRIPTION') end~
+            INSERT_BYTES line_eol (STRING_LENGTH ~%desc_guard%~)
+            WRITE_ASCIIE line_eol ~%desc_guard%~
+          END
+        END
+
+        // Vanilla GUICHISD light parchment lacks text color on scriptOptions labels
+        PATCH_IF (INDEX_BUFFER (~mosaic[ %TAB%]+['"]?GUICHISD['"]?~ 0) >= 0) BEGIN
+          SET lbl_pos = INDEX_BUFFER (~scriptOptions\[rowNumber\]\[1\]~ 0)
+          PATCH_IF (lbl_pos >= 0) BEGIN
+            SET lbl_end = INDEX_BUFFER (~}~ lbl_pos)
+            PATCH_IF (lbl_end > lbl_pos) BEGIN
+              READ_ASCII lbl_pos lbl_slice (lbl_end - lbl_pos)
+              SET has_color = (0 - 1)
+              INNER_PATCH ~%lbl_slice%~ BEGIN
+                SET has_color = INDEX_BUFFER (~text[ %TAB%]+color~ 0)
+              END
+              PATCH_IF (has_color < 0) BEGIN
+                INNER_PATCH_SAVE lbl_slice ~%lbl_slice%~ BEGIN
+                  REPLACE_TEXTUALLY ~text style[ %TAB%]+['"]?normal['"]?~ ~text style	"normal"%LNL%				text color 'D'~
+                END
+                DELETE_BYTES lbl_pos (lbl_end - lbl_pos)
+                INSERT_BYTES lbl_pos (STRING_LENGTH ~%lbl_slice%~)
+                WRITE_ASCIIE lbl_pos ~%lbl_slice%~
+              END
+            END
+          END
+        END
+      END
+
+      DELETE_BYTES cs_menu_pos (cs_end_pos - cs_menu_pos)
+      INSERT_BYTES cs_menu_pos (STRING_LENGTH ~%cs_body%~)
+      WRITE_ASCIIE cs_menu_pos ~%cs_body%~
+    END
+  END
+END
